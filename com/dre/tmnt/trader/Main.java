@@ -1,8 +1,6 @@
 package com.dre.tmnt.trader;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Bukkit;
@@ -32,19 +30,18 @@ public class Main extends JavaPlugin implements Listener{
 	
 	public Inventory inv = null;
 	
-	public static List<Player> playerSendNpcPackets =  new ArrayList<Player>();
-	public static Map<String, Integer> SendPacketWithDelay = new HashMap<String, Integer>();
+	public static Map<Player, Integer> joinedPlayer =  new HashMap<Player, Integer>();
+
 	
 	
-	
-	
-	
+
+
 	public void onEnable(){
 		path = getDataFolder().getAbsolutePath();
 		System.out.println("[Trader] Plugin geladen!");
 		getServer().getPluginManager().registerEvents(new Events(), this);		
 		initConfig();
-		npcHeadRotation();
+		npcsUpdate();
 		new NpcsYml();
 	}
 	
@@ -75,7 +72,7 @@ public class Main extends JavaPlugin implements Listener{
 				PermissionUser user = PermissionsEx.getUser(player);
 				
 				if (args.length == 0){
-					player.sendMessage("/trader help");
+					player.sendMessage(config.getHelp());
 					return true;
 				}
 				
@@ -139,7 +136,7 @@ public class Main extends JavaPlugin implements Listener{
 						player.sendMessage(args[1] + " nicht vorhanden!");
 						return true;
 					}
-					player.sendMessage("Zu viele Argumente!");
+					player.sendMessage(config.getString(Config.MESSAGE_TO_MANY_ARGS));
 					return true;
 				}
 				
@@ -180,37 +177,67 @@ public class Main extends JavaPlugin implements Listener{
 	}
 	
 	
-	public void npcHeadRotation() {
+	public void npcsUpdate() {
 		Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
 			
 			@Override
 			public void run() {
 				
-				for (Player player: playerSendNpcPackets){
-					delayedRemoveFromTablist(player, SendPacketWithDelay.get(player.getName()));
-					if(SendPacketWithDelay.get(player.getName()) >= 100){
-						for(Npc npc: NpcsYml.npcs){
-							npc.removeFromTablist(player);
-						}
-						delayedAddToTablist(player, 40);
-						delayedRemoveFromTablist(player, 41);
-						delayedAddToTablist(player, SendPacketWithDelay.get(player.getName())-1);
-					}
-				}
-				playerSendNpcPackets.removeAll(playerSendNpcPackets);
-				SendPacketWithDelay.clear();
-				
-				
 				for(Npc npc : NpcsYml.npcs){
 					Player closestPlayer = null;
 					for(Player player : Bukkit.getOnlinePlayers()){
 						
-						if(player.getLocation().distance(npc.getLocation()) < 7){
+						int distance = (int) player.getLocation().distance(npc.getLocation());
+						
+						if(distance < 35){
 							if(closestPlayer == null){
 								closestPlayer = player;
 							}
-							if(player.getLocation().distance(npc.getLocation()) < closestPlayer.getLocation().distance(npc.getLocation())){
+							if(distance < closestPlayer.getLocation().distance(npc.getLocation())){
 								closestPlayer = player;
+							}
+						}
+						if(joinedPlayer.containsKey(player)){
+							Integer ticks = joinedPlayer.get(player);
+							
+							if(ticks >= 0){
+								if(distance < 40){
+									delayedAddToTablist(player, npc, ticks - 1);
+									delayedRemoveFromTablist(player, npc, ticks);
+								}
+								joinedPlayer.put(player, joinedPlayer.get(player) - 40);
+							}else{
+								joinedPlayer.remove(player);
+							}
+								
+						}
+						if(distance < 40){
+							boolean isInList = false;
+							for(String name: npc.getPlayerList()){
+								if(name == player.getName()){
+									isInList = true;
+								}
+							}
+							if(!isInList){
+								npc.setPlayerToList(player.getName());
+								npc.spawn(player);
+								delayedRemoveFromTablist(player, npc, 1);
+							}
+							
+							
+						}
+						
+						else if(distance > 45){
+							boolean isInList = false;
+							for(String name: npc.getPlayerList()){
+								if(name == player.getName()){
+									isInList = true;
+								}
+							}
+							if(isInList){
+								npc.removePlayerFromList(player.getName());
+								npc.destroy(player);
+								npc.removeFromTablist(player);
 							}
 						}
 					}
@@ -238,7 +265,7 @@ public class Main extends JavaPlugin implements Listener{
 		}, 0, 1);
 	}
 
-	public void delayedRemoveFromTablist(Player player, int ticks){
+	public void delayedRemoveFromTablist(Player player, Npc npc, int ticks){
 		
 		Bukkit.getScheduler().scheduleSyncDelayedTask(this, new Runnable(){
 			
@@ -253,7 +280,10 @@ public class Main extends JavaPlugin implements Listener{
 		
 	}
 	
-	public void delayedAddToTablist(Player player, int ticks){
+	
+	public void delayedAddToTablist(Player player, Npc npc, int ticks){
+
+			
 		
 		Bukkit.getScheduler().scheduleSyncDelayedTask(this, new Runnable(){
 			
@@ -261,10 +291,25 @@ public class Main extends JavaPlugin implements Listener{
 			public void run() {
 				
 				for(Npc npc: NpcsYml.npcs){
-					npc.spawn(player, -1);
+					npc.spawn(player);
 				}
 				
 			}
 		},ticks);
+	}
+	
+	public void subtractTicks(Player player){
+		Bukkit.getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
+			
+			@Override
+			public void run() {
+				joinedPlayer.put(player, (Integer) joinedPlayer.get(player) - 1);
+				
+			}
+		}, 1);
+	}
+	
+	public static void setJoinedPlayer(Player player) {
+		joinedPlayer.put(player, (Integer) 120);
 	}
 }

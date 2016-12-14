@@ -14,8 +14,6 @@ import org.bukkit.event.inventory.InventoryType.SlotType;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 
-import com.dre.tmnt.npcs.Npc;
-import com.dre.tmnt.npcs.NpcsYml;
 import com.dre.tmnt.trader.Config;
 import com.dre.tmnt.trader.Main;
 import com.dre.tmnt.trader.PacketReader;
@@ -83,14 +81,9 @@ public class Events implements Listener{
 
 		PacketReader pr = new PacketReader(e.getPlayer());
 		pr.inject();
-		
-		for (Npc npc: NpcsYml.npcs){
-			npc.spawn(e.getPlayer(), 150);
-		}		
-	}	
-	
-	
-	
+			
+		Main.setJoinedPlayer(e.getPlayer());
+	}
 }
 
 

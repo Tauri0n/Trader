@@ -1,6 +1,7 @@
 package com.dre.tmnt.npcs;
 
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -10,7 +11,6 @@ import org.bukkit.Location;
 import org.bukkit.craftbukkit.v1_9_R2.util.CraftChatMessage;
 import org.bukkit.entity.Player;
 
-import com.dre.tmnt.trader.Main;
 import com.dre.tmnt.util.GameProfileBuilder;
 import com.dre.tmnt.util.UUIDFetcher;
 import com.mojang.authlib.GameProfile;
@@ -36,8 +36,11 @@ public class Npc extends Reflection{
 	GameProfile gameprofile;
 	String name;
 	String skinName;
+	List <String> playerList = new ArrayList<String>();
 	
 	
+	
+
 	public Npc(String name, Location location, Integer npcID) {
 		entityID = new Random().nextInt(1000000);
 		this.name = name;
@@ -57,7 +60,7 @@ public class Npc extends Reflection{
 	}
 	
 	
-	public void spawn(Player player, Integer delay){
+	public void spawn(Player player){
 		PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
 		
 		setValue(packet, "a", entityID);
@@ -75,16 +78,12 @@ public class Npc extends Reflection{
 		addToTablist(player);
 		sendPacket(packet, player);
 		headRotation(location.getYaw(), location.getPitch());
-		if(delay != -1){
-			Main.playerSendNpcPackets.add(player);
-			Main.SendPacketWithDelay.put(player.getName(), delay);
-		}
 	}
 	
 	
 	public void spawn(){
 		for(Player player: Bukkit.getOnlinePlayers()){
-			spawn(player, 10);
+			spawn(player);
 			
 		}
 	}
@@ -106,6 +105,8 @@ public class Npc extends Reflection{
 	
 	
 	public void headRotation(float yaw, float pitch){
+		location.setYaw(yaw);
+		location.setPitch(pitch);
 		PacketPlayOutEntityLook packet = new PacketPlayOutEntityLook(entityID, getFixRotation(yaw), getFixRotation(pitch), true);
 		PacketPlayOutEntityHeadRotation packetHead = new PacketPlayOutEntityHeadRotation();
 		setValue(packetHead, "a", entityID);
@@ -119,6 +120,11 @@ public class Npc extends Reflection{
 	public void destroy(){
 		PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
 		sendPacket(packet);
+	}
+	
+	public void destroy(Player player){
+		PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
+		sendPacket(packet, player);
 	}
 	
 	
@@ -137,15 +143,25 @@ public class Npc extends Reflection{
 	
 	
 	public void removeFromTablist(Player player) {
-		PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
-		PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(gameprofile, 1, EnumGamemode.NOT_SET, CraftChatMessage.fromString(name)[0]);
-		@SuppressWarnings("unchecked") 
-		List<PlayerInfoData> players = (List<PlayerInfoData>) getValue(packet, "b");
-		players.add(data);
 		
-		setValue(packet, "a", EnumPlayerInfoAction.REMOVE_PLAYER);
-		setValue(packet, "b", players);
-		sendPacket(packet, player);
+		Boolean isOnline = false;
+		for(Player p : Bukkit.getOnlinePlayers()){
+			if(gameprofile.getName().equals(p.getName())){
+				isOnline = true;
+			}
+		}
+		if(!isOnline){
+			PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
+			PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(gameprofile, 1, EnumGamemode.NOT_SET, CraftChatMessage.fromString(name)[0]);
+			@SuppressWarnings("unchecked")
+			List<PlayerInfoData> players = (List<PlayerInfoData>) getValue(packet, "b");
+			players.add(data);
+			
+			setValue(packet, "a", EnumPlayerInfoAction.REMOVE_PLAYER);
+			setValue(packet, "b", players);
+			sendPacket(packet, player);	
+		}
+		
 	}
 	
 	
@@ -203,5 +219,19 @@ public class Npc extends Reflection{
 	
 	public void setNpcId(int i){
 		npcID = i;
+	}
+	
+	
+	public List<String> getPlayerList() {
+		return playerList;
+	}
+
+	
+	public void setPlayerToList(String name) {
+		playerList.add(name);
+	}
+	
+	public void removePlayerFromList(String name) {
+		playerList.remove(name);
 	}
 }
